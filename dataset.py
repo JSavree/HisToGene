@@ -10,6 +10,7 @@ import scanpy as sc
 from utils import get_data
 import os
 import glob
+import PIL
 from PIL import Image
 import pandas as pd 
 import scprep as scp
@@ -32,6 +33,102 @@ MARKERS = []
 for i in IG.values():
     MARKERS+=i
 LYM = {'B_cell':BCELL, 'CD4+T_cell':CD4T, 'CD8+T_cell':CD8T}
+
+class ViT_HEBCT_multilabel(torch.utils.data.Dataset):
+
+    def __init__(self, train=True, ds=None, sr=False, fold=0):  # root, df, transform,
+        self.centers_dir = '/projects/illinois/vetmed/cb/kwang222/pythonDataAnalyze/spot_coordinates/filtered_spot_coordinates'
+        self.labels_dir = '/projects/illinois/vetmed/cb/kwang222/pythonDataAnalyze/sample_binarized_labels/coord_binarized_labels'
+        self.img_dir = '/projects/illinois/vetmed/cb/kwang222/pythonDataAnalyze/sample_images'
+        self.r = 224//4 # this is the image "radius" around the center
+
+        # images are named HE_BTxxxxx_xx.jpg or HE_BCxxxxx_xx.jpg, so we want to remove the first 5 characters when
+        # working with the names
+        img_names = os.listdir(self.img_dir)
+        img_names = [name.split(".", 1)[0] for name in img_names]
+
+        # for testing
+        if train:
+            img_names = img_names[0:20]
+        else:
+            img_names = img_names[20:25]
+        
+        # img_names_test = img_names[:3]
+
+        # I just need to set up the image and center dicts
+        # load pillow images into torch tensors
+        print('Loading imgs...')
+        PIL.Image.MAX_IMAGE_PIXELS = None
+        self.img_dict = {name: torch.Tensor(np.array(self.get_img(name))) for name in img_names}
+
+        # set up a dictionary for the labels corresponding to each sample (which means each dictionary entry will
+        # hold the labels for all the spots in a sample).
+        # this dictionary will store the labels that correspond to the spots in a sample
+        self.cells_dict = {name: self.get_labels(name).to_numpy().astype(np.float32) for name in img_names}
+
+        # set up dictionary for the centers of the spots for each sample
+        self.centers_dict = {name: np.floor(self.get_centers(name).to_numpy()).astype(int) for name in img_names}
+
+        # set up dictionary for the locations of the spots for each sample
+        self.locations_dict = {name: (self.get_centers(name).to_numpy())/160 for name in img_names}
+
+        self.id2name = dict(enumerate(img_names))
+
+    # this transforms one sample image into its respective patches for the spots
+    def __getitem__(self, index):
+        i = index
+        img = self.img_dict[self.id2name[i]]
+        img_perm = img.permute(1, 0, 2)
+        cell_types = self.cells_dict[self.id2name[i]]
+        centers = self.centers_dict[self.id2name[i]]
+        locs = self.locations_dict[self.id2name[i]]
+        positions = torch.LongTensor(locs)
+        patch_dim = 3 * self.r * self.r * 4
+
+        n_patches = len(centers)
+
+        patches = torch.zeros((n_patches, patch_dim))
+        cell_types_tensor = torch.Tensor(cell_types)
+
+        for i in range(n_patches):
+            center = centers[i]
+            x, y = center
+            patch = img_perm[(x-self.r):(x+self.r), (y-self.r):(y+self.r), :]
+            patches[i] = patch.flatten()
+
+        return patches, positions, cell_types_tensor  # torch.Tensor(centers)
+
+    def __len__(self):
+        # temporary, will likely change this to the total number of spots across all samples?
+        return len(self.cells_dict)
+
+    def get_img(self, name):
+        img_path = self.img_dir + "/" + name + ".jpg"
+        print("loading image: " + name)
+        img = Image.open(img_path)
+
+        return img
+
+    def get_centers(self, name):
+        use_name = name[5:]
+        path = self.centers_dir + "/" + "filtered_spots_BC" + use_name + ".csv"
+
+        df = pd.read_csv(path, index_col=0)
+
+        # convert dataframe to numpy array using .to_numpy() and access the individual centers using [i]
+        # or just take the floor of the entire numpy array and change the type to int.
+
+        return df
+
+    def get_labels(self, name):
+        use_name = name[5:]
+
+        path = self.labels_dir + "/" + "filtered_BC" + use_name + "_binarized_union_data" + ".csv"
+
+        df = pd.read_csv(path, index_col=0)
+
+        return df
+
 
 class STDataset(torch.utils.data.Dataset):
     """Some Information about STDataset"""
@@ -242,7 +339,7 @@ class ViT_HER2ST(torch.utils.data.Dataset):
         self.sr = sr
         
         # samples = ['A1','B1','C1','D1','E1','F1','G2','H1']
-        samples = names[1:33]
+        samples = names[1:7]
 
         te_names = [samples[fold]]
         tr_names = list(set(samples)-set(te_names))
@@ -346,6 +443,8 @@ class ViT_HER2ST(torch.utils.data.Dataset):
 
             for i in range(n_patches):
                 center = centers[i]
+                print(im.shape)
+                print(center)
                 x, y = center
                 patch = im[(x-self.r):(x+self.r),(y-self.r):(y+self.r),:]
                 patches[i] = patch.flatten()
@@ -366,7 +465,7 @@ class ViT_HER2ST(torch.utils.data.Dataset):
         return im
 
     def get_cnt(self,name):
-        path = self.cnt_dir+'/'+name+'.tsv'
+        path = self.cnt_dir+'/'+name+'.tsv.gz'
         df = pd.read_csv(path,sep='\t',index_col=0)
 
         return df

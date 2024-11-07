@@ -159,8 +159,14 @@ class HisToGene(pl.LightningModule):
 
     def forward(self, patches, centers):
         patches = self.patch_embedding(patches)
+        #print(centers[:,:,0].shape)
+        #print(centers[:,:,0])
         centers_x = self.x_embed(centers[:,:,0])
+        #print(centers_x)
+        #print(centers[:,:,1].shape)
+        #print(centers[:,:,1])
         centers_y = self.y_embed(centers[:,:,1])
+        #print(centers_y)
         x = patches + centers_x + centers_y
         h = self.vit(x)
         x = self.gene_head(h)
