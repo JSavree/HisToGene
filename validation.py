@@ -17,11 +17,15 @@ def validation_test():
     dataset = ViT_HER2ST(train=False, sr=False, fold=fold)
     test_loader = DataLoader(dataset, batch_size=1, num_workers=4)
 
-    print("loading trainer")
-    trainer = pl.Trainer(max_epochs=1, accelerator="auto")  # gpus=0, ,
+
+
     # change this to testing, and calculate AUROC
-    print("validating trainer")
-    trainer.validate(model=model, dataloaders=test_loader)
+    # We have a model loaded from a checkpoint
+
+    # print("loading trainer")
+    # trainer = pl.Trainer(max_epochs=1, accelerator="auto")  # gpus=0, ,
+    # print("validating trainer")
+    # trainer.validate(model=model, dataloaders=test_loader)
 
 
 validation_test()

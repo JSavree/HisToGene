@@ -36,7 +36,7 @@ LYM = {'B_cell':BCELL, 'CD4+T_cell':CD4T, 'CD8+T_cell':CD8T}
 
 class ViT_HEBCT_multilabel(torch.utils.data.Dataset):
 
-    def __init__(self, train=True, ds=None, sr=False, fold=0):  # root, df, transform,
+    def __init__(self, train=True, val=False, ds=None, sr=False, fold=0):  # root, df, transform,
         self.centers_dir = '/projects/illinois/vetmed/cb/kwang222/pythonDataAnalyze/spot_coordinates/filtered_spot_coordinates'
         self.labels_dir = '/projects/illinois/vetmed/cb/kwang222/pythonDataAnalyze/sample_binarized_labels/coord_binarized_labels'
         self.img_dir = '/projects/illinois/vetmed/cb/kwang222/pythonDataAnalyze/sample_images'
@@ -45,15 +45,35 @@ class ViT_HEBCT_multilabel(torch.utils.data.Dataset):
         # images are named HE_BTxxxxx_xx.jpg or HE_BCxxxxx_xx.jpg, so we want to remove the first 5 characters when
         # working with the names
         img_names = os.listdir(self.img_dir)
-        img_names = [name.split(".", 1)[0] for name in img_names]
+        img_names = [name.split(".", 1)[0] for name in img_names] # get just the patient section of the names
+
+        # to get the patient images, I will just get the first one for now. Since it'll be easier.
+        # So, I will divide the images by the patients. The image dict will get the name of the full name of the image?
+
+	    # The names for the patient are up to 10 characters. So, do [0:10] to get them
+
+	    sample_names = img_names #[0:65]
+
+	    test_names = [sample_names[fold]]
+	    train_names = list(set(sample_names) - set(test_names))
 
         # for testing
         if train:
-            img_names = img_names[0:20]
+            if val:
+                img_names = train_names[0:65]
+            else:
+                img_names = train_names  # sample_names[0:30]
         else:
-            img_names = img_names[20:25]
+            if val:
+                img_names = train_names[65:67]
+            else:
+                img_names = test_names  # sample_names[30:39]
         
         # img_names_test = img_names[:3]
+        # samples = names[1:7]
+        #
+        # te_names = [samples[fold]]
+        # tr_names = list(set(samples)-set(te_names))
 
         # I just need to set up the image and center dicts
         # load pillow images into torch tensors
