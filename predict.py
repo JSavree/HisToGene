@@ -37,13 +37,13 @@ def model_predict_AUROC(model, test_loader, adata=None, attention=True, device=t
     preds = preds.cpu().squeeze().numpy()
     ct = ct.cpu().squeeze().numpy()
     gt = gt.cpu().squeeze().numpy()
-    adata = ann.AnnData(preds)
-    adata.obsm['spatial'] = ct
+    # adata = ann.AnnData(preds)
+    # adata.obsm['spatial'] = ct
+    #
+    # adata_gt = ann.AnnData(gt)
+    # adata_gt.obsm['spatial'] = ct
 
-    adata_gt = ann.AnnData(gt)
-    adata_gt.obsm['spatial'] = ct
-
-    return adata, adata_gt
+    return adata #, adata_gt
 
 
 # device = 'cpu'
